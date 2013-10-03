@@ -53,26 +53,26 @@
 
 -record(state, {
 	parent = undefined :: pid(),
-	socket,
-	transport,
+	socket :: inet:socket(),
+	transport :: module(),
 	buffer = <<>> :: binary(),
-	middlewares,
-	env,
-	onrequest,
-	onresponse,
-	peer,
-	zdef,
-	zinf,
+	middlewares :: [module()],
+	env :: cowboy_middleware:env(),
+	onrequest :: undefined | cowboy:onrequest_fun(),
+	onresponse :: undefined | cowboy:onresponse_fun(),
+	peer :: {inet:ip_address(), Port::non_neg_integer()},
+	zdef :: zlib:zstream(),
+	zinf :: zlib:zstream(),
 	last_streamid = 0 :: non_neg_integer(),
 	children = [] :: [#child{}]
 }).
 
 -record(special_headers, {
-	method,
-	path,
-	version,
-	host,
-	scheme %% @todo We don't use it.
+	method :: binary(),
+	path :: binary(),
+	version :: binary(),
+	host :: binary(),
+	scheme :: binary() %% @todo We don't use it.
 }).
 
 -type opts() :: [].
