@@ -332,6 +332,9 @@ split_path(Path, Acc) ->
 				lists:reverse([cowboy_http:urldecode(S) || S <- Acc]);
 			nomatch ->
 				lists:reverse([cowboy_http:urldecode(S) || S <- [Path|Acc]]);
+			{0, _} ->
+				<<_:8, Rest/bits >> = Path,
+				split_path(Rest, Acc);
 			{Pos, _} ->
 				<< Segment:Pos/binary, _:8, Rest/bits >> = Path,
 				split_path(Rest, [Segment|Acc])
