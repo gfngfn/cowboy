@@ -233,7 +233,9 @@ parse_uri_path(<< C, Rest/bits >>, State, Method, SoFar) ->
 		$? -> parse_uri_query(Rest, State, Method, SoFar, <<>>);
 		$# -> skip_uri_fragment(Rest, State, Method, SoFar, <<>>);
 		_ -> parse_uri_path(Rest, State, Method, << SoFar/binary, C >>)
-	end.
+	end;
+parse_uri_path(<<_/binary>>, State, _Method, _SoFar) ->
+    error_terminate(400, State).
 
 parse_uri_query(<< C, Rest/bits >>, S, M, P, SoFar) ->
 	case C of
