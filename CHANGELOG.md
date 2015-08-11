@@ -1,6 +1,64 @@
 CHANGELOG
 =========
 
+1.0.3
+-----
+
+ *  Add CircleCI for automated testing across all supported Erlang versions
+
+ *  Only send the Connection header when necessary
+
+ *  Send Connection: keep-alive when HTTP/1.0 connections are kept open
+
+ *  Fix a typo in a return value of cowboy_http:asctime_date
+
+ *  Fix Dialyzer warnings in cowboy_clock
+
+1.0.2
+-----
+
+ *  Fix cowboy_clock inbox overflow when system clock changes (but see 1.0.3)
+
+ *  Fix stacktrace shown on REST handler crashes
+
+ *  Reply with 400 on if-match and if-not-match parsing crash
+
+ *  Improve static_world example by adding index.html file
+
+1.0.1
+-----
+
+ *  Add missing cowboy_req:part/2 export
+
+ *  Fix an issue building dependencies on FreeBSD
+
+ *  Improve support for requests with an absolute URI
+
+ *  Small fixes to the documentation
+
+1.0.0
+-----
+
+ *  Drop R15 support
+
+ *  Update erlang.mk, Ranch and Cowlib to 1.0.0
+
+ *  Complete the user guide and simplify the Getting started chapter
+
+ *  Document the HTTP status codes Cowboy may send in the manual
+
+ *  Provide installable man pages (see README)
+
+ *  Support ad-hoc keep-alive for HTTP/1.0 clients
+
+ *  Fix SPDY parsing error when many frames were received in one packet
+
+ *  Reply with 400 instead of 422 in cowboy_rest
+
+ *  Reply with 400 instead of 500 on header parsing crash
+
+ *  Remove deprecated body reading interface (see 0.10.0 notes)
+
 0.10.0
 ------
 

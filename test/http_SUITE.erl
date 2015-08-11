@@ -193,6 +193,7 @@ init_dispatch(Config) ->
 			{"/multipart/large", http_multipart_stream, []},
 			{"/echo/body", http_echo_body, []},
 			{"/echo/body_qs", http_body_qs, []},
+			{"/crash/content-length", input_crash_h, content_length},
 			{"/param_all", rest_param_all, []},
 			{"/bad_accept", rest_simple_resource, []},
 			{"/bad_content_type", rest_patch_resource, []},
@@ -274,6 +275,7 @@ The document has moved
 		{400, "GET / HTTP/1.1\r\nHost: ninenines.eu\r\n\r\n"},
 		{400, "GET http://proxy/ HTTP/1.1\r\n\r\n"},
 		{400, "GET / HTTP/1.1\r\nHost: localhost:bad_port\r\n\r\n"},
+		{400, ["POST /crash/content-length HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5000,5000\r\n\r\n", Huge]},
 		{505, ResponsePacket},
 		{408, "GET / HTTP/1.1\r\n"},
 		{408, "GET / HTTP/1.1\r\nHost: localhost"},
@@ -424,6 +426,40 @@ http10_hostless(Config) ->
 		[{port, Port10}|Config]),
 	cowboy:stop_listener(http10_hostless).
 
+http10_keepalive_default(Config) ->
+	Normal = "GET / HTTP/1.0\r\nhost: localhost\r\n\r\n",
+	Client = raw_open(Config),
+	ok = raw_send(Client, Normal),
+	case catch raw_recv_head(Client) of
+		{'EXIT', _} -> error(closed);
+		Data ->
+			{'HTTP/1.0', 200, _, Rest} = cow_http:parse_status_line(Data),
+			{Headers, _} = cow_http:parse_headers(Rest),
+			false = lists:keymember(<<"connection">>, 1, Headers)
+	end,
+	ok = raw_send(Client, Normal),
+	case catch raw_recv_head(Client) of
+		{'EXIT', _} -> closed;
+		_ -> error(not_closed)
+	end.
+
+http10_keepalive_forced(Config) ->
+	Keepalive = "GET / HTTP/1.0\r\nhost: localhost\r\nConnection: keep-alive\r\n\r\n",
+	Client = raw_open(Config),
+	ok = raw_send(Client, Keepalive),
+	case catch raw_recv_head(Client) of
+		{'EXIT', _} -> error(closed);
+		Data ->
+			{'HTTP/1.0', 200, _, Rest} = cow_http:parse_status_line(Data),
+			{Headers, _} = cow_http:parse_headers(Rest),
+			{_, <<"keep-alive">>} = lists:keyfind(<<"connection">>, 1, Headers)
+	end,
+	ok = raw_send(Client, Keepalive),
+	case catch raw_recv_head(Client) of
+		{'EXIT', Err} -> error({closed, Err});
+		_ -> ok
+	end.
+
 keepalive_max(Config) ->
 	{ConnPid, MRef} = gun_monitor_open(Config),
 	Refs = [gun:get(ConnPid, "/", [{<<"connection">>, <<"keep-alive">>}])
@@ -431,7 +467,7 @@ keepalive_max(Config) ->
 	CloseRef = gun:get(ConnPid, "/", [{<<"connection">>, <<"keep-alive">>}]),
 	_ = [begin
 		{response, nofin, 200, Headers} = gun:await(ConnPid, Ref, MRef),
-		{_, <<"keep-alive">>} = lists:keyfind(<<"connection">>, 1, Headers)
+		false = lists:keymember(<<"connection">>, 1, Headers)
 	end || Ref <- Refs],
 	{response, nofin, 200, Headers} = gun:await(ConnPid, CloseRef, MRef),
 	{_, <<"close">>} = lists:keyfind(<<"connection">>, 1, Headers),
@@ -446,7 +482,7 @@ keepalive_nl(Config) ->
 	end || _ <- lists:seq(1, 10)],
 	_ = [begin
 		{response, nofin, 200, Headers} = gun:await(ConnPid, Ref),
-		{_, <<"keep-alive">>} = lists:keyfind(<<"connection">>, 1, Headers)
+		false = lists:keymember(<<"connection">>, 1, Headers)
 	end || Ref <- Refs],
 	ok.
 
@@ -700,7 +736,7 @@ rest_keepalive(Config) ->
 	Refs = [gun:get(ConnPid, "/simple") || _ <- lists:seq(1, 10)],
 	_ = [begin
 		{response, nofin, 200, Headers} =  gun:await(ConnPid, Ref),
-		{_, <<"keep-alive">>} = lists:keyfind(<<"connection">>, 1, Headers)
+		false = lists:keymember(<<"connection">>, 1, Headers)
 	end || Ref <- Refs],
 	ok.
 
@@ -714,9 +750,9 @@ rest_keepalive_post(Config) ->
 	} || _ <- lists:seq(1, 5)],
 	_ = [begin
 		{response, fin, 403, Headers1} = gun:await(ConnPid, Ref1),
-		{_, <<"keep-alive">>} = lists:keyfind(<<"connection">>, 1, Headers1),
+		false = lists:keymember(<<"connection">>, 1, Headers1),
 		{response, fin, 303, Headers2} = gun:await(ConnPid, Ref2),
-		{_, <<"keep-alive">>} = lists:keyfind(<<"connection">>, 1, Headers2)
+		false = lists:keymember(<<"connection">>, 1, Headers2)
 	end || {Ref1, Ref2} <- Refs],
 	ok.
 
@@ -749,7 +785,7 @@ rest_options_default(Config) ->
 rest_patch(Config) ->
 	Tests = [
 		{204, [{<<"content-type">>, <<"text/plain">>}], <<"whatever">>},
-		{422, [{<<"content-type">>, <<"text/plain">>}], <<"false">>},
+		{400, [{<<"content-type">>, <<"text/plain">>}], <<"false">>},
 		{400, [{<<"content-type">>, <<"text/plain">>}], <<"halt">>},
 		{415, [{<<"content-type">>, <<"application/json">>}], <<"bad_content_type">>}
 	],

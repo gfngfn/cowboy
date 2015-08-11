@@ -56,8 +56,7 @@
 }).
 
 -spec upgrade(Req, Env, module(), any())
-	-> {ok, Req, Env} | {error, 500, Req}
-	when Req::cowboy_req:req(), Env::cowboy_middleware:env().
+	-> {ok, Req, Env} when Req::cowboy_req:req(), Env::cowboy_middleware:env().
 upgrade(Req, Env, Handler, HandlerOpts) ->
 	Method = cowboy_req:get(method, Req),
 	case erlang:function_exported(Handler, rest_init, 2) of
@@ -67,11 +66,12 @@ upgrade(Req, Env, Handler, HandlerOpts) ->
 					service_available(Req2, #state{env=Env, method=Method,
 						handler=Handler, handler_state=HandlerState})
 			catch Class:Reason ->
-				cowboy_req:maybe_reply(500, Req),
+				Stacktrace = erlang:get_stacktrace(),
+				cowboy_req:maybe_reply(Stacktrace, Req),
 				erlang:Class([
 					{reason, Reason},
 					{mfa, {Handler, rest_init, 2}},
-					{stacktrace, erlang:get_stacktrace()},
+					{stacktrace, Stacktrace},
 					{req, cowboy_req:to_list(Req)},
 					{opts, HandlerOpts}
 				])
@@ -529,7 +529,9 @@ if_match_exists(Req, State) ->
 		{ok, '*', Req2} ->
 			if_unmodified_since_exists(Req2, State2);
 		{ok, ETagsList, Req2} ->
-			if_match(Req2, State2, ETagsList)
+			if_match(Req2, State2, ETagsList);
+		{error, badarg} ->
+			respond(Req, State2, 400)
 	end.
 
 if_match(Req, State, EtagsList) ->
@@ -579,7 +581,9 @@ if_none_match_exists(Req, State) ->
 		{ok, '*', Req2} ->
 			precondition_is_head_get(Req2, State);
 		{ok, EtagsList, Req2} ->
-			if_none_match(Req2, State, EtagsList)
+			if_none_match(Req2, State, EtagsList);
+		{error, badarg} ->
+			respond(Req, State, 400)
 	end.
 
 if_none_match(Req, State, EtagsList) ->
@@ -781,7 +785,7 @@ process_content_type(Req, State=#state{method=Method, exists=Exists}, Fun) ->
 			next(Req2, State2, fun maybe_created/2);
 		{false, Req2, HandlerState2} ->
 			State2 = State#state{handler_state=HandlerState2},
-			respond(Req2, State2, 422);
+			respond(Req2, State2, 400);
 		{{true, ResURL}, Req2, HandlerState2} when Method =:= <<"POST">> ->
 			State2 = State#state{handler_state=HandlerState2},
 			Req3 = cowboy_req:set_resp_header(
@@ -999,12 +1003,13 @@ terminate(Req, State=#state{env=Env}) ->
 
 error_terminate(Req, State=#state{handler=Handler, handler_state=HandlerState},
 		Class, Reason, Callback) ->
+	Stacktrace = erlang:get_stacktrace(),
 	rest_terminate(Req, State),
-	cowboy_req:maybe_reply(500, Req),
+	cowboy_req:maybe_reply(Stacktrace, Req),
 	erlang:Class([
 		{reason, Reason},
 		{mfa, {Handler, Callback, 2}},
-		{stacktrace, erlang:get_stacktrace()},
+		{stacktrace, Stacktrace},
 		{req, cowboy_req:to_list(Req)},
 		{state, HandlerState}
 	]).
