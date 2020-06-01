@@ -14,6 +14,7 @@ PLT_APPS = crypto public_key ssl
 
 DEPS = cowlib ranch
 TEST_DEPS = ct_helper gun
+dep_gun_commit = 335eb50a06c574fb9dfb50cac6185aa18e8c3834
 dep_ct_helper = git https://github.com/extend/ct_helper.git master
 
 # Standard targets.
